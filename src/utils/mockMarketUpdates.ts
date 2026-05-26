@@ -9,6 +9,7 @@ function clamp(val: number, min: number, max: number): number {
 }
 
 export function updateContestant(c: Contestant): Contestant {
+  if (!c.contractAddress || c.comingSoon || c.price === 0) return c
   const newPrice = clamp(drift(c.price, 0.02), 0.000001, 100)
   const ratio = newPrice / (c.price || 1)
   return {
@@ -26,13 +27,11 @@ export function updateContestant(c: Contestant): Contestant {
 }
 
 export function updateHubToken(h: HubToken): HubToken {
-  const newPrice = clamp(drift(h.price, 0.015), 0.000001, 100)
-  const ratio = newPrice / (h.price || 1)
+  if (h.marketCap === 0) return h
   return {
     ...h,
-    price: newPrice,
-    marketCap: Math.round(h.marketCap * ratio),
-    fdv: Math.round(h.fdv * ratio),
+    marketCap: Math.round(drift(h.marketCap, 0.015)),
+    fdv: Math.round(drift(h.fdv, 0.015)),
     volume24h: Math.round(drift(h.volume24h, 0.04)),
     holders: Math.max(1, h.holders + (Math.random() > 0.7 ? 1 : 0)),
     change24h: clamp(drift(h.change24h, 0.08), -99, 200),

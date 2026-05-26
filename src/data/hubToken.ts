@@ -1,7 +1,6 @@
 export type HubToken = {
   name: string;
   ticker: string;
-  price: number;
   marketCap: number;
   volume24h: number;
   holders: number;
@@ -17,8 +16,6 @@ export type HubToken = {
 export const hubToken: HubToken = {
   name: "Love Island",
   ticker: "$LOVEISLAND",
-  // These are initial values — the site fetches live data on load
-  price: 0,
   marketCap: 0,
   volume24h: 0,
   holders: 0,

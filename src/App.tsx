@@ -18,9 +18,16 @@ function usePumpImage(addr: string) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
     if (!addr) return
-    fetch(`https://frontend-api.pump.fun/coins/${addr}`)
+    // Try pump.fun API via allorigins CORS proxy
+    const apiUrl = `https://frontend-api.pump.fun/coins/${addr}`
+    const proxied = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`
+    fetch(proxied)
       .then(r => r.json())
-      .then(d => { if (d?.image_uri) setUrl(d.image_uri) })
+      .then(d => {
+        const inner = JSON.parse(d.contents || '{}')
+        const img = inner?.image_uri || inner?.image || null
+        if (img) setUrl(img)
+      })
       .catch(() => {})
   }, [addr])
   return url
@@ -81,25 +88,6 @@ function NavBar({ liveCount }: { liveCount: number }) {
     </>
   )
 }
-
-// ── Ticker ────────────────────────────────────────────────────
-
-function TickerTape({ contestants }: { contestants: Contestant[] }) {
-  const items = [...contestants, ...contestants]
-  return (
-    <div className="ticker-wrap bg-black/60 border-y border-pink-neon/20 py-2">
-      <div className="ticker-inner flex gap-8">
-        {items.map((c, i) => {
-          const { text, colorClass } = formatChange(c.change24h)
-          return (
-            <span key={`${c.id}-${i}`} className="inline-flex items-center gap-2 text-sm font-mono whitespace-nowrap px-4">
-              <span className="text-pink-soft font-semibold">{c.ticker}</span>
-              <span className="text-white/70">{formatPrice(c.price)}</span>
-              <span className={`${colorClass} font-semibold`}>{text}</span>
-              <span className="text-white/20">·</span>
-            </span>
-          )
-        })}
       </div>
     </div>
   )
@@ -172,7 +160,7 @@ function HubTokenSection({ token }: { token: HubToken }) {
   const [imgFailed, setImgFailed] = useState(false)
   const imageUrl = usePumpImage(token.contractAddress)
   const { text: changeText, colorClass: changeColor } = formatChange(token.change24h)
-  const isLoading = token.price === 0
+  const isLoading = token.marketCap === 0
 
   return (
     <section id="hub" className="relative py-24 px-4 overflow-hidden">
@@ -190,15 +178,10 @@ function HubTokenSection({ token }: { token: HubToken }) {
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }}
           className="neon-border glass rounded-3xl p-8 md:p-10">
-          <div className="flex flex-wrap items-start justify-between gap-6 mb-10">
-            <div>
-              <div className="text-white/40 text-sm font-body mb-1">Price</div>
-              {isLoading ? <div className="skeleton h-12 w-48" /> : <div className="font-display font-black text-5xl text-white">{formatPrice(token.price)}</div>}
-              {!isLoading && <div className={`${changeColor} text-xl font-semibold mt-1`}>{changeText} today</div>}
-            </div>
+          <div className="flex justify-end mb-6">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-emerald-400 text-xs font-body">{isLoading ? 'Loading...' : 'Live'}</span>
+              <span className="text-emerald-400 text-xs font-body">Live on Solana</span>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
@@ -264,7 +247,7 @@ function ContestantCard({ c, rank, isFav, onFav }: { c: Contestant; rank?: numbe
       )}
       <div className={`glass rounded-3xl overflow-hidden transition-all duration-300 ${hovered && !c.comingSoon ? 'shadow-[0_20px_60px_#FF2D7822,0_0_0_1px_#FF2D7833]' : 'shadow-[0_4px_20px_#00000033]'} ${c.eliminated || c.comingSoon ? 'opacity-75' : ''}`}>
         {/* Avatar */}
-        <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-rich to-villa-dark" style={{ aspectRatio: '3/2' }}>
+        <div className="relative w-full overflow-hidden bg-gradient-to-br from-purple-rich to-villa-dark" style={{ aspectRatio: '1/1' }}>
           {c.comingSoon ? (
             <div className="w-full h-full flex flex-col items-center justify-center gap-2"
               style={{ background: `radial-gradient(circle at 40% 40%, hsl(${hue},50%,25%), hsl(${(hue+60)%360},40%,12%))` }}>
@@ -288,13 +271,13 @@ function ContestantCard({ c, rank, isFav, onFav }: { c: Contestant; rank?: numbe
         <div className="p-3">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h3 className="font-display font-bold text-base text-white leading-tight">{c.name}</h3>
+              <h3 className="font-display font-bold text-sm text-white leading-tight">{c.name}</h3>
               <span className="text-pink-soft text-xs font-mono">{c.ticker}</span>
             </div>
             <span className="text-lg">{c.country === 'USA' ? '🇺🇸' : '🇬🇧'}</span>
           </div>
           {c.comingSoon ? (
-            <div className="py-3 text-center"><span className="text-white/30 text-xs font-body">Token launching soon 🌴</span></div>
+            <div className="py-2 text-center"><span className="text-white/30 text-xs font-body">Coming soon 🌴</span></div>
           ) : (
             <>
               <div className="flex items-baseline gap-2 mb-3">
@@ -405,7 +388,7 @@ function ContestantBoard({ contestants, favorites, onToggleFavorite }: { contest
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-8 items-start">
             <div>
               <div className="flex items-center gap-3 mb-6"><span className="text-2xl">🇺🇸</span><h3 className="font-display font-bold text-2xl text-white">USA</h3><span className="ml-auto text-white/30 text-sm">{usa.length} islanders</span></div>
-              <div className="flex flex-col gap-4">{usa.map((c, i) => <motion.div key={c.id} initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.04 }}><ContestantCard c={c} rank={allRanked[c.id]} isFav={favorites.includes(c.id)} onFav={onToggleFavorite} /></motion.div>)}</div>
+              <div className="grid grid-cols-2 gap-3">{usa.map((c, i) => <motion.div key={c.id} initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.04 }}><ContestantCard c={c} rank={allRanked[c.id]} isFav={favorites.includes(c.id)} onFav={onToggleFavorite} /></motion.div>)}</div>
             </div>
             <div className="hidden lg:flex flex-col items-center py-8">
               <div className="w-px flex-1 bg-gradient-to-b from-transparent via-pink-neon/30 to-transparent" />
@@ -414,7 +397,7 @@ function ContestantBoard({ contestants, favorites, onToggleFavorite }: { contest
             </div>
             <div>
               <div className="flex items-center gap-3 mb-6"><span className="text-2xl">🇬🇧</span><h3 className="font-display font-bold text-2xl text-white">UK</h3><span className="ml-auto text-white/30 text-sm">{uk.length} islanders</span></div>
-              <div className="flex flex-col gap-4">{uk.map((c, i) => <motion.div key={c.id} initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.04 }}><ContestantCard c={c} rank={allRanked[c.id]} isFav={favorites.includes(c.id)} onFav={onToggleFavorite} /></motion.div>)}</div>
+              <div className="grid grid-cols-2 gap-3">{uk.map((c, i) => <motion.div key={c.id} initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.04 }}><ContestantCard c={c} rank={allRanked[c.id]} isFav={favorites.includes(c.id)} onFav={onToggleFavorite} /></motion.div>)}</div>
             </div>
           </div>
         ) : (
@@ -694,7 +677,6 @@ export default function App() {
     <main className="min-h-screen bg-[#0A0010]">
       <NavBar liveCount={liveCount} />
       <HeroSection liveCount={liveCount} />
-      {liveContestants.length > 0 && <TickerTape contestants={liveContestants} />}
       <HubTokenSection token={hubToken} />
       <ContestantBoard contestants={contestants} favorites={favorites} onToggleFavorite={toggleFavorite} />
       <LeaderboardSection contestants={contestants} />
